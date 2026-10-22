@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estoque de produtos</title>
+  <script>try{document.documentElement.dataset.tema=localStorage.getItem('tema')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch{}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="faixa">
+    <header class="topo">
+      <div class="marca"><span class="logo" data-ico="pacote"></span><h1>Estoque</h1></div>
+      <div class="conta">
+        <button id="btn-tema" type="button" class="icone" aria-label="Alternar entre tema claro e escuro"></button>
+        <div id="usuario" class="perfil" hidden>
+          <span id="avatar" class="avatar" aria-hidden="true"></span>
+          <span><strong id="u-nome"></strong><small id="u-tipo"></small></span>
+        </div>
+        <button id="btn-entrar" type="button">Entrar</button>
+        <button id="btn-sair" type="button" class="sec" hidden>Sair</button>
+      </div>
+    </header>
+    <section class="hero">
+      <h2 id="hero-titulo">Estoque de produtos</h2>
+      <p id="hero-sub"></p>
+    </section>
+  </div>
+
+  <main>
+    <section class="stats" aria-label="Resumo do estoque">
+      <article class="stat">
+        <span class="bolha azul" data-ico="pacote"></span>
+        <span class="txt"><strong id="st-total">0</strong><small>Produtos cadastrados</small></span>
+      </article>
+      <button id="st-destaque-btn" type="button" class="stat" aria-pressed="false">
+        <span class="bolha amarela" data-ico="fogo"></span>
+        <span class="txt"><strong id="st-destaque">0</strong><small>Vendem muito</small></span>
+      </button>
+      <button id="st-baixo-btn" type="button" class="stat" aria-pressed="false">
+        <span class="bolha vermelha" data-ico="alerta"></span>
+        <span class="txt"><strong id="st-baixo">0</strong><small>Estoque baixo</small></span>
+      </button>
+      <article class="stat">
+        <span class="bolha verde" data-ico="moeda"></span>
+        <span class="txt"><strong id="st-valor">R$ 0</strong><small>Valor em estoque</small></span>
+      </article>
+    </section>
+
+    <!-- Área de cadastro e edição de produtos (só aparece para admin) -->
+    <section id="painel" class="painel" aria-labelledby="painel-titulo" hidden>
+      <div class="painel-cab">
+        <div>
+          <p class="kicker">Painel do admin</p>
+          <h2 id="painel-titulo">Cadastrar produto</h2>
+          <p id="painel-sub" class="sub">Preencha os dados e veja a etiqueta ao vivo.</p>
+        </div>
+        <button id="btn-recolher" type="button" class="sec pequeno" aria-expanded="true" aria-controls="painel-corpo"><span class="rot">Recolher</span></button>
+      </div>
+
+      <div id="painel-corpo" class="painel-corpo">
+        <form id="form-produto">
+          <div class="grade">
+            <p class="campo cheio"><label for="p-nome">Nome do produto</label><input id="p-nome" required maxlength="80" autocomplete="off" placeholder="Ex.: Teclado mecânico"></p>
+            <p class="campo"><label for="p-preco">Preço</label><span class="prefixo"><span>R$</span><input id="p-preco" type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0,00"></span></p>
+            <div class="campo">
+              <label for="p-estoque">Estoque</label>
+              <span class="passo">
+                <button type="button" data-passo="-1" aria-label="Diminuir estoque" data-ico="menos"></button>
+                <input id="p-estoque" type="number" min="0" step="1" required inputmode="numeric" placeholder="0">
+                <button type="button" data-passo="1" aria-label="Aumentar estoque" data-ico="mais"></button>
+              </span>
+            </div>
+            <p class="campo cheio">
+              <label for="p-cat">Categoria</label>
+              <input id="p-cat" list="categorias" required maxlength="40" autocomplete="off" placeholder="Digite ou escolha uma existente">
+              <datalist id="categorias"></datalist>
+            </p>
+            <div id="sugestoes" class="sugestoes cheio" aria-label="Categorias existentes"></div>
+          </div>
+          <label class="sw"><input id="p-destaque" type="checkbox"> Vendeu muito</label>
+          <p id="p-erro" class="msg-erro" role="alert" hidden></p>
+          <div class="acoes">
+            <button id="btn-cancelar" type="button" class="sec">Limpar</button>
+            <button id="btn-salvar" type="submit"><span class="ico" data-ico="mais"></span><span class="rot">Cadastrar produto</span></button>
+          </div>
+        </form>
+
+        <aside class="preview" aria-label="Pré-visualização da etiqueta">
+          <p class="preview-rot">Pré-visualização</p>
+          <div id="preview"></div>
+          <p class="dica">A etiqueta muda enquanto você digita.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="barra" aria-label="Filtros">
+      <div class="busca">
+        <span class="ico" data-ico="lupa"></span>
+        <input id="busca" type="search" placeholder="Buscar por nome (atalho: /)" aria-label="Buscar por nome" autocomplete="off">
+      </div>
+      <label class="ordem"><span>Ordenar</span>
+        <select id="ordem">
+          <option value="nome">Nome (A a Z)</option>
+          <option value="preco-asc">Menor preço</option>
+          <option value="preco-desc">Maior preço</option>
+          <option value="estoque-asc">Menor estoque</option>
+        </select>
+      </label>
+    </section>
+    <div id="chips" class="chips" role="group" aria-label="Filtrar por categoria"></div>
+
+    <div class="resumo-linha">
+      <p id="resumo" class="resumo" aria-live="polite"></p>
+      <button id="btn-limpar" type="button" class="link" hidden>Limpar filtros</button>
+    </div>
+    <section id="lista" class="lista"></section>
+  </main>
+
+  <dialog id="dlg-login" aria-labelledby="login-titulo">
+    <form id="form-login">
+      <span class="bolha azul grande" data-ico="pacote"></span>
+      <h2 id="login-titulo">Entrar</h2>
+      <p class="sub">Use o email e a senha da sua conta.</p>
+      <p class="campo"><label for="l-email">Email</label><input id="l-email" type="email" required autocomplete="username" placeholder="voce@email.com"></p>
+      <p class="campo">
+        <label for="l-senha">Senha</label>
+        <span class="senha">
+          <input id="l-senha" type="password" required autocomplete="current-password">
+          <button id="btn-olho" type="button" class="olho" aria-label="Mostrar senha" aria-pressed="false"></button>
+        </span>
+      </p>
+      <p id="l-erro" class="msg-erro" role="alert" hidden></p>
+      <div class="acoes">
+        <button type="button" class="sec" data-fechar>Cancelar</button>
+        <button id="btn-login" type="submit"><span class="rot">Entrar</span></button>
+      </div>
+    </form>
+
+    <div id="login-ok" class="login-ok" role="status" hidden>
+      <div id="confete" class="confete" aria-hidden="true"></div>
+      <svg class="check" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24" fill="none"/><path d="M14 27l8 8 16-17" fill="none"/></svg>
+      <h2 id="ok-msg">Login realizado com sucesso</h2>
+      <p id="ok-nome"></p>
+      <button id="btn-continuar" type="button">Continuar</button>
+    </div>
+  </dialog>
+
+  <div id="toasts" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
