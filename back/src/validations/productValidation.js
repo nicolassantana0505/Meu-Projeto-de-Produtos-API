@@ -15,7 +15,11 @@ const productSchema = z.object({
 
   estoque: z
     .number()
-    .min(0, "O estoque não pode ser negativo.")
+    .min(0, "O estoque não pode ser negativo."),
+  
+  vendeu_muito: z
+    .boolean(),
+
 });
 
 module.exports = {
