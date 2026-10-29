@@ -1,7 +1,7 @@
 const Product = require("../models/Product");
 
 async function listarProdutos(filtros) {
-  const { categoria, search, page = 1, limit = 10 } = filtros;
+  const { categoria, search, page = 1, limit = 10, precoMax } = filtros;
 
   const query = {};
 
@@ -11,6 +11,10 @@ async function listarProdutos(filtros) {
 
   if (search) {
     query.nome = { $regex: search, $options: "i" };
+  }
+
+  if (precoMax) {
+    query.preco = { $lte: Number(precoMax)}
   }
 
   const skip = (Number(page) - 1) * Number(limit);

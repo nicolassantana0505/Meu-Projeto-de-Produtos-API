@@ -7,24 +7,30 @@ function isValidObjectId(id) {
 }
 
 async function listarProdutos(req, res, next) {
-  try {
-    const { categoria, search, page, limit } = req.query
+  try { 
+    const { categoria, search, page, limit, precoMax } = req.query;
 
-    if (page && Number(page) < 1) {
+    if(page && Number(page) < 1) {
       return res.status(400).json({
-        erro: 'A página deve ser maior ou igual a 1.',
-      })
+        erro: "A pagina deve ser maior ou igual a 1"
+      });
     }
 
     if (limit && Number(limit) < 1) {
       return res.status(400).json({
-        erro: 'O limite deve ser maior ou igual a 1.',
-      })
+        erro: "O limite deve ser maior ou igual a 1"
+      });
     }
 
     if (limit && Number(limit) > 100) {
       return res.status(400).json({
-        erro: 'O limite máximo permitido é 100.',
+        erro: "O limite maximo permitido é 100"
+      });
+    }
+
+    if (precoMax && Number(precoMax) < 0) {
+      return res.status(400).json({
+        erro: "O preço maximo não pode ser negativo"
       })
     }
 
@@ -33,11 +39,12 @@ async function listarProdutos(req, res, next) {
       search,
       page,
       limit,
-    })
+      precoMax
+    });
 
     res.json(resultado)
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
 
