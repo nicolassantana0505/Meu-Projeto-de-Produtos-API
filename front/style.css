@@ -340,6 +340,117 @@ dialog.tremer { animation: tremer 0.4s; }
 @keyframes barra { to { transform: scaleX(0); } }
 @keyframes entrar-toast { from { opacity: 0; transform: translateY(14px) scale(0.96); } }
 
+/* ---------- carrinho no topo ---------- */
+.icone { position: relative; }
+.badge { position: absolute; top: -3px; right: -4px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: var(--amarelo); color: #14213d; font-size: 0.72rem; font-weight: 800; line-height: 19px; text-align: center; box-shadow: 0 0 0 2px #1b2f5e; }
+.badge.bump { animation: bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes bump { 40% { transform: scale(1.5); } }
+.alterna { margin: 16px 0 0; text-align: center; color: var(--suave); font-size: 0.92rem; }
+.alterna .link { padding: 0 2px; font-weight: 600; }
+
+/* ---------- comprar no card ---------- */
+.compra { margin-top: 14px; }
+.compra button { width: 100%; padding: 8px 12px; font-size: 0.92rem; }
+.compra button[disabled] { cursor: not-allowed; opacity: 0.55; }
+.comprar { background: var(--verde); border-color: var(--verde); color: #fff; }
+:root[data-tema="dark"] .comprar { color: #08241d; }
+.comprar:hover:not(:disabled) { background: color-mix(in srgb, var(--verde) 85%, #000); border-color: transparent; }
+.comprar .ico { transition: transform 0.25s; }
+.comprar:hover .ico { transform: translateX(3px) rotate(-8deg); }
+.qtd-ctl { display: inline-flex; align-items: center; justify-content: space-between; min-width: 112px; border: 1.5px solid var(--verde); border-radius: 10px; overflow: hidden; }
+.compra .qtd-ctl { display: flex; }
+.qtd-ctl button { width: 34px; padding: 6px 0; border: 0; border-radius: 0; background: transparent; color: var(--verde); }
+.qtd-ctl button:hover:not(:disabled) { background: color-mix(in srgb, var(--verde) 16%, transparent); border: 0; }
+.qtd-ctl output { flex: 1; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ---------- gaveta (carrinho e pedidos) ---------- */
+dialog.gaveta { position: fixed; inset: 0 0 0 auto; width: min(460px, 100vw); height: 100dvh; max-height: none; margin: 0; overflow: hidden; border-radius: 20px 0 0 20px; }
+dialog.gaveta[open] { display: flex; flex-direction: column; animation: deslizar 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
+@keyframes deslizar { from { transform: translateX(100%); } }
+.gaveta-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 14px 0 18px; border-bottom: 1px solid var(--linha); }
+.abas { display: flex; gap: 4px; }
+.abas button { margin-bottom: -1px; padding: 10px 12px; border: 0; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; background: transparent; color: var(--suave); }
+.abas button:hover:not(:disabled) { background: color-mix(in srgb, var(--foco) 10%, transparent); border-color: transparent; border-bottom-color: transparent; }
+.abas button[aria-selected="true"] { border-bottom-color: var(--amarelo); color: var(--tinta); }
+.qtd-aba { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--amarelo); color: #14213d; font-size: 0.74rem; font-weight: 800; text-align: center; }
+.icone-x { width: 36px; height: 36px; padding: 0; border-color: transparent; background: transparent; color: var(--suave); font-size: 1.5rem; line-height: 1; }
+.icone-x:hover:not(:disabled) { background: color-mix(in srgb, var(--alerta) 14%, transparent); border-color: transparent; color: var(--alerta); }
+.gaveta-corpo { flex: 1; padding: 16px 18px 20px; overflow-y: auto; overscroll-behavior: contain; }
+.gaveta-corpo > .kicker { margin: 4px 0 10px; }
+.gaveta-rodape { padding: 14px 18px 18px; border-top: 1px solid var(--linha); background: color-mix(in srgb, var(--papel) 55%, var(--cartao)); }
+.total { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; color: var(--suave); }
+.total strong { color: var(--tinta); font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.finalizar { width: 100%; padding: 13px; font-size: 1.02rem; background: var(--amarelo); border-color: var(--amarelo); color: #14213d; }
+.finalizar:hover:not(:disabled) { background: #ffd75f; border-color: #ffd75f; }
+.vazio-gaveta { display: grid; justify-items: center; gap: 6px; padding: 48px 12px; text-align: center; color: var(--suave); }
+.vazio-gaveta strong { color: var(--tinta); font-size: 1.15rem; }
+.vazio-gaveta p { margin: 0 0 10px; }
+.vazio-gaveta .bolha { margin-bottom: 4px; }
+
+.itens { display: grid; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
+.item { --c: hsl(var(--h) var(--cat-s) var(--cat-l)); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--linha); border-left: 4px solid var(--c); border-radius: 12px; background: var(--campo); animation: entrar 0.35s ease-out both; animation-delay: calc(var(--n) * 40ms); }
+.mini-tag { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); font-weight: 800; }
+.item-info { min-width: 0; }
+.item-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-info small { color: var(--suave); }
+.item-dir { display: grid; justify-items: end; gap: 6px; }
+.item-dir b { font-variant-numeric: tabular-nums; }
+.item-dir .qtd-ctl { min-width: 96px; }
+.item-dir .qtd-ctl button { width: 28px; padding: 3px 0; }
+
+.sucesso { position: relative; display: grid; justify-items: center; gap: 8px; padding: 36px 8px 8px; text-align: center; }
+.sucesso .confete { top: 96px; }
+.sucesso h2 { margin: 6px 0 0; color: var(--verde); font-size: 1.5rem; }
+.sucesso p { max-width: 32ch; margin: 0 0 10px; color: var(--suave); }
+.sucesso button { width: min(260px, 100%); }
+.check-box { display: block; }
+
+/* ---------- pedidos ---------- */
+.pedidos { display: grid; gap: 14px; }
+.esqueleto.pequeno { height: 150px; }
+.pedido { padding: 14px; border: 1px solid var(--linha); border-radius: 14px; background: var(--campo); animation: entrar 0.35s ease-out both; animation-delay: calc(var(--n, 0) * 50ms); }
+.pedido-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pedido-topo strong { display: block; font-size: 1.02rem; }
+.pedido-topo small { color: var(--suave); }
+.status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--t) 16%, transparent); color: var(--t); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+.s-pendente { --t: #b07d00; }
+:root[data-tema="dark"] .s-pendente { --t: var(--amarelo); }
+.s-pago { --t: var(--foco); }
+.s-enviado { --t: var(--verde); }
+.s-cancelado { --t: var(--alerta); }
+.status .ico svg { width: 1em; height: 1em; }
+.etapas { display: grid; grid-template-columns: repeat(3, 1fr); margin: 16px 0 6px; padding: 0; list-style: none; }
+.etapa { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--suave); font-size: 0.78rem; text-align: center; }
+.etapa::before { content: ""; position: absolute; top: 15px; right: 50%; width: 100%; height: 3px; background: var(--linha); }
+.etapa:first-child::before { display: none; }
+.etapa.feita::before { background: var(--verde); }
+.etapa .bola { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--linha); color: var(--suave); }
+.etapa.feita .bola { background: var(--verde); color: #fff; }
+.etapa.atual { color: var(--tinta); font-weight: 700; }
+.etapa.atual .bola { animation: pulso 1.8s ease-out infinite; }
+@keyframes pulso { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--verde) 55%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.cancelado-aviso { margin: 12px 0 4px; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--alerta) 12%, transparent); color: var(--alerta); font-size: 0.9rem; font-weight: 600; }
+.itens-det { margin-top: 10px; border-top: 1px dashed var(--linha); padding-top: 8px; }
+.itens-det summary { cursor: pointer; color: var(--suave); font-size: 0.9rem; font-weight: 600; }
+.itens-det summary:hover { color: var(--tinta); }
+.itens-det ul { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 0.92rem; }
+.itens-det li { display: flex; justify-content: space-between; gap: 10px; }
+.itens-det li b { font-variant-numeric: tabular-nums; }
+.pedido-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; color: var(--suave); }
+.pedido-total strong { color: var(--tinta); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.pedido-acoes { display: flex; gap: 8px; margin-top: 10px; }
+.pedido-acoes button { flex: 1; }
+.status-admin { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--linha); }
+.status-admin small { display: block; margin-bottom: 6px; color: var(--suave); font-weight: 600; }
+.status-botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini[aria-pressed="true"] { border-color: var(--primario); background: var(--primario); color: var(--sobre-primario); }
+.mini[aria-pressed="true"]:hover:not(:disabled) { background: var(--primario); border-color: var(--primario); color: var(--sobre-primario); }
+.caixa-admin { margin-bottom: 18px; padding: 14px; border: 1px solid var(--linha); border-left: 5px solid var(--amarelo); border-radius: 12px; background: var(--campo); }
+.caixa-admin .kicker { margin-bottom: 8px; }
+.busca-admin { display: flex; gap: 8px; }
+.busca-admin input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 0.9rem; }
+.resultado-admin:not(:empty) { margin-top: 12px; }
+
 /* ---------- telas pequenas ---------- */
 @media (max-width: 820px) {
   .painel-corpo { grid-template-columns: 1fr; }
@@ -354,6 +465,10 @@ dialog.tremer { animation: tremer 0.4s; }
   .painel-cab, .painel-corpo { padding-inline: 16px; }
   .ordem, .ordem select { flex: 1; }
   #toasts { right: 12px; bottom: 12px; }
+  .conta { gap: 6px; }
+  .icone { width: 36px; height: 36px; }
+  dialog.gaveta { border-radius: 0; }
+  .abas button { padding-inline: 8px; font-size: 0.9rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

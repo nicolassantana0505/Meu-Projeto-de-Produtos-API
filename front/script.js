@@ -12,6 +12,11 @@ const estado = {
   token: null,
   usuario: null,
   editandoId: null,
+  carrinho: new Map(), // produtoId -> quantidade
+  pedidos: [],
+  aba: 'carrinho',
+  finalizado: false,
+  erroCarrinho: '',
   filtros: { categoria: '', destaque: false, baixo: false },
 }
 const ehAdmin = () => estado.usuario?.tipo === 'admin'
@@ -67,6 +72,18 @@ const SVG = {
   menos: traco('<path d="M5 12h14"/>'),
   lapis: traco('<path d="M4 20l1-4L16.5 4.5a2 2 0 013 3L8 19l-4 1z"/>'),
   lixo: traco('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
+  carrinho: traco(
+    '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.4 11.2a1 1 0 001 .8h9.2a1 1 0 001-.8L20 7H6"/>',
+  ),
+  recibo: traco('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>'),
+  relogio: traco('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  cartao: traco('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'),
+  caminhao: traco(
+    '<path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="6" cy="18" r="1.7"/><circle cx="17" cy="18" r="1.7"/>',
+  ),
+  x: traco('<path d="M6 6l12 12M18 6L6 18"/>'),
+  refazer: traco('<path d="M3 12a9 9 0 0115.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 01-15.5 6.2L3 16M3 21v-5h5"/>'),
+  copiar: traco('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>'),
 }
 function icone(nome) {
   const el = h('span', { class: 'ico' })
@@ -324,6 +341,23 @@ function criarCard(p, { n = 0, preview = false } = {}) {
   if (!preview) {
     card.dataset.id = p._id
     if (p._id === estado.editandoId) card.classList.add('em-edicao')
+    const noCarrinho = estado.carrinho.get(p._id) ?? 0
+    card.append(
+      h(
+        'div',
+        { class: 'compra' },
+        p.estoque === 0
+          ? h('button', { type: 'button', class: 'sec', disabled: '' }, 'Esgotado')
+          : noCarrinho
+            ? controleQtd(p, noCarrinho)
+            : h(
+                'button',
+                { type: 'button', class: 'comprar', onclick: () => adicionar(p) },
+                icone('carrinho'),
+                h('span', { class: 'rot' }, 'Adicionar'),
+              ),
+      ),
+    )
     if (ehAdmin()) {
       const excluir = h(
         'button',
@@ -519,6 +553,7 @@ async function carregar({ silencioso = false } = {}) {
     estado.carregado = true
     atualizarCategorias()
     atualizarStats()
+    sanearCarrinho()
     render({ entrada: !silencioso })
   } catch (erro) {
     if (silencioso) {
@@ -566,6 +601,8 @@ function atualizarConta() {
   const logado = Boolean(estado.token && estado.usuario)
   $('#btn-entrar').hidden = logado
   $('#btn-sair').hidden = !logado
+  $('#btn-carrinho').hidden = !logado
+  $('#btn-pedidos').hidden = !logado
   $('#usuario').hidden = !logado
   if (logado) {
     $('#avatar').textContent = (estado.usuario.nome || '?')
@@ -579,13 +616,16 @@ function atualizarConta() {
     ? `Olá, ${estado.usuario.nome.trim().split(' ')[0]}!`
     : 'Estoque de produtos'
   $('#hero-sub').textContent = ehAdmin()
-    ? 'Você é administrador: cadastre, edite e exclua produtos por aqui.'
+    ? 'Você é administrador: gerencie produtos e o status dos pedidos por aqui.'
     : logado
-      ? 'Confira o que há no estoque.'
-      : 'Veja o que há no estoque. Entre para gerenciar os produtos.'
+      ? 'Adicione produtos ao carrinho, finalize o pedido e acompanhe o status.'
+      : 'Veja o que há no estoque. Entre para comprar ou gerenciar produtos.'
 
   $('#painel').hidden = !ehAdmin()
   if (!ehAdmin()) resetarForm()
+  carregarCarrinho()
+  if (estado.carregado) sanearCarrinho()
+  else atualizarCarrinhoUI()
   if (estado.carregado) render()
 }
 
@@ -593,6 +633,7 @@ function sair() {
   estado.token = null
   estado.usuario = null
   localStorage.removeItem('token')
+  if (dlgGaveta.open) dlgGaveta.close()
   atualizarConta()
 }
 
@@ -621,10 +662,10 @@ $('#btn-olho').addEventListener('click', () => {
 })
 $('#btn-olho').innerHTML = SVG.olho
 
-function confete() {
+function confete(alvo = $('#confete')) {
   if (reduzMovimento) return
   const cores = ['#ffc93c', '#0e7c66', '#2b5fd9', '#c8372d', '#ffffff']
-  $('#confete').replaceChildren(
+  alvo.replaceChildren(
     ...Array.from({ length: 34 }, (_, i) => {
       const pedaco = h('i')
       pedaco.style.cssText = `--x:${(Math.random() - 0.5) * 360}px;--y:${-70 - Math.random() * 150}px;--r:${Math.random() * 720 - 360}deg;--d:${Math.random() * 150}ms;background:${cores[i % cores.length]}`
@@ -643,41 +684,68 @@ function mostrarSucessoLogin(mensagem, usuario) {
   timerLogin = setTimeout(() => dlgLogin.close(), 2200)
 }
 
+let modoCadastro = false
+function definirModo(cadastro) {
+  modoCadastro = cadastro
+  $('#campo-nome').hidden = !cadastro
+  $('#l-nome').required = cadastro
+  $('#l-senha').autocomplete = cadastro ? 'new-password' : 'current-password'
+  $('#login-titulo').textContent = cadastro ? 'Criar conta' : 'Entrar'
+  $('#login-sub').textContent = cadastro
+    ? 'Leva menos de um minuto. A senha precisa ter 6 caracteres ou mais.'
+    : 'Use o email e a senha da sua conta.'
+  $('#btn-login .rot').textContent = cadastro ? 'Criar conta' : 'Entrar'
+  $('#alt-txt').textContent = cadastro ? 'Já tem conta?' : 'Ainda não tem conta?'
+  $('#btn-alternar').textContent = cadastro ? 'Entrar' : 'Criar conta'
+  $('#l-erro').hidden = true
+}
+$('#btn-alternar').addEventListener('click', () => {
+  definirModo(!modoCadastro)
+  $(modoCadastro ? '#l-nome' : '#l-email').focus()
+})
+
+function erroNoLogin(texto) {
+  $('#l-erro').textContent = texto
+  $('#l-erro').hidden = false
+  dlgLogin.classList.add('tremer')
+  dlgLogin.addEventListener(
+    'animationend',
+    () => dlgLogin.classList.remove('tremer'),
+    { once: true },
+  )
+}
+
 $('#form-login').addEventListener('submit', async (evento) => {
   evento.preventDefault()
   const botao = $('#btn-login')
+  const criando = modoCadastro
+  const email = $('#l-email').value.trim()
+  const senha = $('#l-senha').value
   $('#l-erro').hidden = true
-  ocupado(botao, true, 'Entrando')
+  if (criando && senha.length < 6)
+    return erroNoLogin('A senha deve ter pelo menos 6 caracteres.')
+
+  ocupado(botao, true, criando ? 'Criando conta' : 'Entrando')
   let dados
   try {
+    if (criando)
+      await api('/usuarios', {
+        method: 'POST',
+        body: JSON.stringify({ nome: $('#l-nome').value.trim(), email, senha }),
+      })
     dados = await api('/login', {
       method: 'POST',
-      body: JSON.stringify({
-        email: $('#l-email').value.trim(),
-        senha: $('#l-senha').value,
-      }),
+      body: JSON.stringify({ email, senha }),
     })
   } catch (erro) {
-    $('#l-erro').textContent = erro.message
-    $('#l-erro').hidden = false
-    dlgLogin.classList.add('tremer')
-    dlgLogin.addEventListener(
-      'animationend',
-      () => dlgLogin.classList.remove('tremer'),
-      { once: true },
-    )
-    return
+    return erroNoLogin(erro.message)
   } finally {
     ocupado(botao, false)
   }
 
   const usuario = dados.usuario ?? usuarioDoToken(dados.token)
-  if (!dados.token || !usuario) {
-    $('#l-erro').textContent =
-      'O servidor respondeu algo inesperado. Tente de novo.'
-    $('#l-erro').hidden = false
-    return
-  }
+  if (!dados.token || !usuario)
+    return erroNoLogin('O servidor respondeu algo inesperado. Tente de novo.')
   estado.token = dados.token
   estado.usuario = {
     nome: usuario.nome,
@@ -687,7 +755,7 @@ $('#form-login').addEventListener('submit', async (evento) => {
   localStorage.setItem('token', dados.token)
   atualizarConta()
   mostrarSucessoLogin(
-    dados.mensagem || 'Login realizado com sucesso',
+    criando ? 'Conta criada com sucesso' : dados.mensagem || 'Login realizado com sucesso',
     estado.usuario,
   )
 })
@@ -699,6 +767,7 @@ dlgLogin.addEventListener('close', () => {
   $('#login-ok').hidden = true
   $('#form-login').hidden = false
   $('#form-login').reset()
+  definirModo(false)
   $('#l-senha').type = 'password'
   $('#btn-olho').innerHTML = SVG.olho
   if (entrou) toast('Login realizado com sucesso!', 'ok')
@@ -868,22 +937,498 @@ function confirmarExclusao(botao, produto) {
     })
 }
 
+// ---------- carrinho ----------
+const dlgGaveta = $('#dlg-gaveta')
+const chaveCarrinho = () => `carrinho:${estado.usuario?.email ?? ''}`
+const produtoPorId = (id) => estado.produtos.find((p) => p._id === id)
+
+function salvarCarrinho() {
+  if (!estado.usuario) return
+  try {
+    localStorage.setItem(chaveCarrinho(), JSON.stringify([...estado.carrinho]))
+  } catch {}
+}
+function carregarCarrinho() {
+  estado.carrinho = new Map()
+  if (!estado.usuario) return
+  try {
+    for (const [id, q] of JSON.parse(localStorage.getItem(chaveCarrinho()) || '[]'))
+      if (Number(q) > 0) estado.carrinho.set(id, Number(q))
+  } catch {}
+}
+// Remove do carrinho o que sumiu do estoque e ajusta quantidades acima do disponível.
+function sanearCarrinho() {
+  let mudou = false
+  for (const [id, q] of estado.carrinho) {
+    const p = produtoPorId(id)
+    if (!p || p.estoque < 1) {
+      estado.carrinho.delete(id)
+      mudou = true
+    } else if (q > p.estoque) {
+      estado.carrinho.set(id, p.estoque)
+      mudou = true
+    }
+  }
+  if (mudou) salvarCarrinho()
+  atualizarCarrinhoUI()
+}
+const itensCarrinho = () =>
+  [...estado.carrinho]
+    .map(([id, qtd]) => ({ p: produtoPorId(id), qtd }))
+    .filter((i) => i.p)
+const qtdCarrinho = () => [...estado.carrinho.values()].reduce((s, q) => s + q, 0)
+const totalCarrinho = () => itensCarrinho().reduce((s, i) => s + i.p.preco * i.qtd, 0)
+
+function atualizarCarrinhoUI(pulsar = false) {
+  const n = qtdCarrinho()
+  const badge = $('#carrinho-qtd')
+  badge.textContent = n > 99 ? '99+' : String(n)
+  badge.hidden = n === 0
+  if (pulsar && !reduzMovimento) {
+    badge.classList.remove('bump')
+    void badge.offsetWidth // reinicia a animação
+    badge.classList.add('bump')
+  }
+  $('#aba-qtd').textContent = String(n)
+  $('#aba-qtd').hidden = n === 0
+  if (dlgGaveta.open && estado.aba === 'carrinho' && !estado.finalizado) renderCarrinho()
+}
+
+function pedirLogin() {
+  toast('Entre na sua conta para comprar.', 'info')
+  $('#btn-entrar').click()
+}
+
+function mudarQtd(p, delta) {
+  const atual = estado.carrinho.get(p._id) ?? 0
+  if (delta > 0 && atual >= p.estoque) {
+    toast(`Só temos ${p.estoque} unidade${p.estoque === 1 ? '' : 's'} de “${p.nome}”.`, 'info')
+    return
+  }
+  const nova = Math.max(0, Math.min(p.estoque, atual + delta))
+  if (nova === 0) estado.carrinho.delete(p._id)
+  else estado.carrinho.set(p._id, nova)
+  estado.erroCarrinho = ''
+  salvarCarrinho()
+  atualizarCarrinhoUI(delta > 0)
+  render()
+}
+function adicionar(p) {
+  if (!estado.token) return pedirLogin()
+  mudarQtd(p, 1)
+}
+
+// Botões − e + usados no card do produto e no carrinho.
+function controleQtd(p, qtd) {
+  return h(
+    'div',
+    { class: 'qtd-ctl' },
+    h('button', { type: 'button', 'aria-label': `Diminuir ${p.nome}`, onclick: () => mudarQtd(p, -1) }, icone('menos')),
+    h('output', { 'aria-live': 'polite' }, String(qtd)),
+    h('button', { type: 'button', 'aria-label': `Aumentar ${p.nome}`, onclick: () => mudarQtd(p, 1) }, icone('mais')),
+  )
+}
+
+// ---------- gaveta: carrinho e pedidos ----------
+function abrirGaveta(aba = 'carrinho') {
+  if (!estado.token) return pedirLogin()
+  if (!dlgGaveta.open) dlgGaveta.showModal()
+  trocarAba(aba)
+}
+function trocarAba(aba) {
+  estado.aba = aba
+  estado.finalizado = false
+  estado.erroCarrinho = ''
+  $$('[data-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.aba === aba)))
+  if (aba === 'carrinho') renderCarrinho()
+  else renderPedidos()
+  $('#gaveta-corpo').scrollTop = 0
+}
+
+function vazioGaveta(titulo, texto, botao) {
+  return h(
+    'div',
+    { class: 'vazio-gaveta' },
+    h('span', { class: 'bolha azul grande' }, icone(botao.ico)),
+    h('strong', {}, titulo),
+    h('p', {}, texto),
+    h('button', { type: 'button', onclick: botao.fn }, botao.rotulo),
+  )
+}
+
+function renderCarrinho() {
+  const itens = itensCarrinho()
+  const corpo = $('#gaveta-corpo')
+  const rodape = $('#gaveta-rodape')
+  if (!itens.length) {
+    rodape.hidden = true
+    corpo.replaceChildren(
+      vazioGaveta('Seu carrinho está vazio', 'Adicione produtos da lista para montar seu pedido.', {
+        ico: 'carrinho',
+        rotulo: 'Ver produtos',
+        fn: () => dlgGaveta.close(),
+      }),
+    )
+    return
+  }
+
+  corpo.replaceChildren(
+    h(
+      'ul',
+      { class: 'itens' },
+      ...itens.map(({ p, qtd }, i) => {
+        const li = h(
+          'li',
+          { class: 'item', style: `--h:${matizDaCategoria(p.categoria)};--n:${Math.min(i, 8)}` },
+          h('span', { class: 'mini-tag', 'aria-hidden': 'true' }, p.nome.trim().charAt(0).toUpperCase()),
+          h(
+            'div',
+            { class: 'item-info' },
+            h('strong', {}, p.nome),
+            h('small', {}, `${dinheiro(p.preco)} cada · ${p.estoque} em estoque`),
+          ),
+          h(
+            'div',
+            { class: 'item-dir' },
+            h('b', {}, dinheiro(p.preco * qtd)),
+            controleQtd(p, qtd),
+          ),
+        )
+        return li
+      }),
+    ),
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'link',
+        onclick: () => {
+          estado.carrinho.clear()
+          estado.erroCarrinho = ''
+          salvarCarrinho()
+          atualizarCarrinhoUI()
+          render()
+        },
+      },
+      'Esvaziar carrinho',
+    ),
+  )
+
+  const erro = h('p', { class: 'msg-erro', role: 'alert' }, estado.erroCarrinho)
+  erro.hidden = !estado.erroCarrinho
+  const n = qtdCarrinho()
+  rodape.replaceChildren(
+    h(
+      'div',
+      { class: 'total' },
+      h('span', {}, `${n} ${n === 1 ? 'item' : 'itens'}`),
+      h('strong', {}, dinheiro(totalCarrinho())),
+    ),
+    erro,
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'finalizar',
+        onclick: (e) => finalizarPedido(e.currentTarget),
+      },
+      icone('recibo'),
+      h('span', { class: 'rot' }, 'Finalizar pedido'),
+    ),
+  )
+  rodape.hidden = false
+}
+
+const CHECK_SVG =
+  '<svg class="check" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24" fill="none"/><path d="M14 27l8 8 16-17" fill="none"/></svg>'
+
+async function finalizarPedido(botao) {
+  const itens = [...estado.carrinho].map(([produtoId, quantidade]) => ({ produtoId, quantidade }))
+  if (!itens.length) return
+  estado.erroCarrinho = ''
+  ocupado(botao, true, 'Enviando pedido')
+  let pedido
+  try {
+    pedido = await api('/pedidos', { method: 'POST', body: JSON.stringify({ itens }) })
+  } catch (erro) {
+    estado.erroCarrinho = erro.message
+    renderCarrinho()
+    carregar({ silencioso: true }) // o estoque pode ter mudado
+    return
+  } finally {
+    ocupado(botao, false)
+  }
+
+  estado.finalizado = true
+  estado.carrinho.clear()
+  salvarCarrinho()
+  atualizarCarrinhoUI()
+  carregar({ silencioso: true })
+  mostrarSucessoPedido(pedido)
+}
+
+function mostrarSucessoPedido(pedido) {
+  $('#gaveta-rodape').hidden = true
+  const confeteEl = h('div', { class: 'confete', 'aria-hidden': 'true' })
+  const check = h('span', { class: 'check-box' })
+  check.innerHTML = CHECK_SVG
+  $('#gaveta-corpo').replaceChildren(
+    h(
+      'div',
+      { class: 'sucesso', role: 'status' },
+      confeteEl,
+      check,
+      h('h2', {}, 'Pedido realizado!'),
+      h(
+        'p',
+        {},
+        `Pedido #${codigoPedido(pedido)} no valor de ${dinheiro(pedido.total ?? 0)}. Agora é só aguardar o pagamento.`,
+      ),
+      h('button', { type: 'button', onclick: () => trocarAba('pedidos') }, 'Acompanhar pedido'),
+      h('button', { type: 'button', class: 'sec', onclick: () => dlgGaveta.close() }, 'Continuar comprando'),
+    ),
+  )
+  confete(confeteEl)
+}
+
+// ---------- pedidos ----------
+const STATUS = {
+  pendente: { rot: 'Aguardando pagamento', curto: 'Pedido feito', ico: 'relogio' },
+  pago: { rot: 'Pago', curto: 'Pago', ico: 'cartao' },
+  enviado: { rot: 'Enviado', curto: 'Enviado', ico: 'caminhao' },
+  cancelado: { rot: 'Cancelado', curto: 'Cancelado', ico: 'x' },
+}
+const ETAPAS = ['pendente', 'pago', 'enviado']
+const codigoPedido = (pd) => String(pd._id ?? '').slice(-6).toUpperCase()
+const dataPedido = (pd) =>
+  pd.createdAt
+    ? new Date(pd.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : ''
+
+async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto)
+    toast('ID do pedido copiado.')
+  } catch {
+    toast(`Não consegui copiar. ID: ${texto}`, 'info')
+  }
+}
+
+function repetirPedido(pd) {
+  const faltando = []
+  let adicionados = 0
+  for (const item of pd.itens) {
+    const p = produtoPorId(item.produto)
+    if (!p || p.estoque < 1) {
+      faltando.push(item.nome)
+      continue
+    }
+    const nova = Math.min(p.estoque, (estado.carrinho.get(p._id) ?? 0) + item.quantidade)
+    estado.carrinho.set(p._id, nova)
+    adicionados++
+  }
+  salvarCarrinho()
+  atualizarCarrinhoUI(true)
+  render()
+  if (faltando.length) toast(`Sem estoque agora: ${faltando.join(', ')}.`, 'info')
+  else toast('Itens adicionados ao carrinho.')
+  if (adicionados) trocarAba('carrinho')
+}
+
+async function mudarStatus(pd, status, card, botao) {
+  if (pd.status === status) return
+  botao.disabled = true
+  try {
+    const novo = await api(`/pedidos/${pd._id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+    pd.status = novo.status ?? status
+    card.replaceWith(cardPedido(pd))
+    toast(`Pedido #${codigoPedido(pd)}: ${STATUS[pd.status].rot.toLowerCase()}.`)
+  } catch (erro) {
+    botao.disabled = false
+    toast(erro.message, 'erro')
+  }
+}
+
+function cardPedido(pd, { n = 0 } = {}) {
+  const st = STATUS[pd.status] ?? STATUS.pendente
+  const itens = pd.itens ?? []
+  const qtd = itens.reduce((s, i) => s + i.quantidade, 0)
+  const atual = ETAPAS.indexOf(pd.status)
+
+  const card = h(
+    'article',
+    { class: 'pedido', style: `--n:${Math.min(n, 8)}` },
+    h(
+      'div',
+      { class: 'pedido-topo' },
+      h('div', {}, h('strong', {}, `Pedido #${codigoPedido(pd)}`), h('small', {}, dataPedido(pd))),
+      h('span', { class: `status s-${pd.status}` }, icone(st.ico), st.rot),
+    ),
+    pd.status === 'cancelado'
+      ? h('p', { class: 'cancelado-aviso' }, 'Este pedido foi cancelado.')
+      : h(
+          'ol',
+          { class: 'etapas' },
+          ...ETAPAS.map((e, i) =>
+            h(
+              'li',
+              { class: `etapa${i <= atual ? ' feita' : ''}${i === atual ? ' atual' : ''}` },
+              h('span', { class: 'bola' }, icone(STATUS[e].ico)),
+              h('span', {}, STATUS[e].curto),
+            ),
+          ),
+        ),
+    h(
+      'details',
+      { class: 'itens-det' },
+      h('summary', {}, `${qtd} ${qtd === 1 ? 'item' : 'itens'}`),
+      h(
+        'ul',
+        {},
+        ...itens.map((i) =>
+          h('li', {}, h('span', {}, `${i.quantidade}× ${i.nome}`), h('b', {}, dinheiro(i.subtotal))),
+        ),
+      ),
+    ),
+    h('div', { class: 'pedido-total' }, h('span', {}, 'Total'), h('strong', {}, dinheiro(pd.total))),
+    h(
+      'div',
+      { class: 'pedido-acoes' },
+      h(
+        'button',
+        { type: 'button', class: 'sec pequeno', onclick: () => repetirPedido(pd) },
+        icone('refazer'),
+        h('span', { class: 'rot' }, 'Repetir'),
+      ),
+      h(
+        'button',
+        { type: 'button', class: 'sec pequeno', onclick: () => copiarTexto(pd._id), title: 'Copiar ID do pedido' },
+        icone('copiar'),
+        h('span', { class: 'rot' }, 'Copiar ID'),
+      ),
+    ),
+  )
+
+  if (ehAdmin()) {
+    card.append(
+      h(
+        'div',
+        { class: 'status-admin' },
+        h('small', {}, 'Alterar status'),
+        h(
+          'div',
+          { class: 'status-botoes' },
+          ...Object.keys(STATUS).map((s) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'mini',
+                'aria-pressed': String(pd.status === s),
+                onclick: (e) => mudarStatus(pd, s, card, e.currentTarget),
+              },
+              STATUS[s].rot,
+            ),
+          ),
+        ),
+      ),
+    )
+  }
+  return card
+}
+
+// O back só deixa o admin consultar um pedido de cada vez, pelo ID.
+function buscaAdmin() {
+  const resultado = h('div', { class: 'resultado-admin' })
+  const campo = h('input', {
+    placeholder: 'Cole o ID do pedido (24 caracteres)',
+    maxlength: '24',
+    autocomplete: 'off',
+    'aria-label': 'ID do pedido',
+  })
+  const botao = h('button', { type: 'submit', class: 'pequeno' }, icone('lupa'), h('span', { class: 'rot' }, 'Buscar'))
+  const form = h(
+    'form',
+    {
+      class: 'busca-admin',
+      onsubmit: async (e) => {
+        e.preventDefault()
+        const id = campo.value.trim()
+        if (!/^[a-f0-9]{24}$/i.test(id)) {
+          resultado.replaceChildren(h('p', { class: 'msg-erro' }, 'O ID precisa ter 24 caracteres (letras de a-f e números).'))
+          return
+        }
+        ocupado(botao, true, 'Buscando')
+        try {
+          resultado.replaceChildren(cardPedido(await api(`/pedidos/${id}`)))
+        } catch (erro) {
+          resultado.replaceChildren(h('p', { class: 'msg-erro' }, erro.message))
+        } finally {
+          ocupado(botao, false)
+        }
+      },
+    },
+    campo,
+    botao,
+  )
+  return h('section', { class: 'caixa-admin' }, h('p', { class: 'kicker' }, 'Admin · buscar pedido'), form, resultado)
+}
+
+async function renderPedidos() {
+  $('#gaveta-rodape').hidden = true
+  const lista = h('div', { class: 'pedidos' }, h('div', { class: 'esqueleto pequeno' }), h('div', { class: 'esqueleto pequeno' }))
+  $('#gaveta-corpo').replaceChildren(...(ehAdmin() ? [buscaAdmin()] : []), h('p', { class: 'kicker' }, 'Meus pedidos'), lista)
+  try {
+    const dados = await api('/meus-pedidos')
+    if (estado.aba !== 'pedidos') return
+    estado.pedidos = Array.isArray(dados) ? dados : []
+    lista.replaceChildren(
+      ...(estado.pedidos.length
+        ? estado.pedidos.map((pd, i) => cardPedido(pd, { n: i }))
+        : [
+            vazioGaveta('Nenhum pedido ainda', 'Quando você finalizar uma compra, ela aparece aqui.', {
+              ico: 'recibo',
+              rotulo: 'Ver produtos',
+              fn: () => dlgGaveta.close(),
+            }),
+          ]),
+    )
+  } catch (erro) {
+    if (estado.aba !== 'pedidos') return
+    lista.replaceChildren(
+      h(
+        'div',
+        { class: 'aviso' },
+        h('strong', {}, 'Não foi possível carregar seus pedidos'),
+        erro.message,
+        h('div', {}, h('button', { type: 'button', onclick: renderPedidos }, 'Tentar de novo')),
+      ),
+    )
+  }
+}
+
+$('#btn-carrinho').addEventListener('click', () => abrirGaveta('carrinho'))
+$('#btn-pedidos').addEventListener('click', () => abrirGaveta('pedidos'))
+$$('[data-aba]').forEach((b) => b.addEventListener('click', () => trocarAba(b.dataset.aba)))
+dlgGaveta.addEventListener('close', () => {
+  estado.finalizado = false
+})
+
 // ---------- eventos gerais ----------
 $$('[data-fechar]').forEach((b) =>
   b.addEventListener('click', () => b.closest('dialog').close()),
 )
 // Clicar fora da janela fecha.
-dlgLogin.addEventListener('click', (e) => {
-  if (e.target !== dlgLogin) return
-  const r = dlgLogin.getBoundingClientRect()
-  if (
-    e.clientX < r.left ||
-    e.clientX > r.right ||
-    e.clientY < r.top ||
-    e.clientY > r.bottom
-  )
-    dlgLogin.close()
-})
+for (const dlg of $$('dialog'))
+  dlg.addEventListener('click', (e) => {
+    if (e.target !== dlg) return
+    const r = dlg.getBoundingClientRect()
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+      dlg.close()
+  })
 
 for (const id of ['#busca', '#ordem'])
   $(id).addEventListener('input', () => render())
@@ -915,6 +1460,19 @@ document.addEventListener('keydown', (e) => {
     return
   e.preventDefault()
   $('#busca').focus()
+})
+
+// "C" abre o carrinho.
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey) return
+  if (
+    !estado.token ||
+    document.querySelector('dialog[open]') ||
+    /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)
+  )
+    return
+  e.preventDefault()
+  abrirGaveta('carrinho')
 })
 
 restaurarSessao()

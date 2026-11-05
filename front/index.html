@@ -16,6 +16,8 @@
       <div class="marca"><span class="logo" data-ico="pacote"></span><h1>Estoque</h1></div>
       <div class="conta">
         <button id="btn-tema" type="button" class="icone" aria-label="Alternar entre tema claro e escuro"></button>
+        <button id="btn-pedidos" type="button" class="icone" hidden aria-label="Meus pedidos" title="Meus pedidos"><span class="ico" data-ico="recibo"></span></button>
+        <button id="btn-carrinho" type="button" class="icone" hidden aria-label="Abrir carrinho (atalho: C)" title="Carrinho (C)"><span class="ico" data-ico="carrinho"></span><span id="carrinho-qtd" class="badge" hidden>0</span></button>
         <div id="usuario" class="perfil" hidden>
           <span id="avatar" class="avatar" aria-hidden="true"></span>
           <span><strong id="u-nome"></strong><small id="u-tipo"></small></span>
@@ -124,7 +126,8 @@
     <form id="form-login">
       <span class="bolha azul grande" data-ico="pacote"></span>
       <h2 id="login-titulo">Entrar</h2>
-      <p class="sub">Use o email e a senha da sua conta.</p>
+      <p id="login-sub" class="sub">Use o email e a senha da sua conta.</p>
+      <p id="campo-nome" class="campo" hidden><label for="l-nome">Nome</label><input id="l-nome" maxlength="60" autocomplete="name" placeholder="Seu nome"></p>
       <p class="campo"><label for="l-email">Email</label><input id="l-email" type="email" required autocomplete="username" placeholder="voce@email.com"></p>
       <p class="campo">
         <label for="l-senha">Senha</label>
@@ -138,6 +141,7 @@
         <button type="button" class="sec" data-fechar>Cancelar</button>
         <button id="btn-login" type="submit"><span class="rot">Entrar</span></button>
       </div>
+      <p class="alterna"><span id="alt-txt">Ainda não tem conta?</span> <button id="btn-alternar" type="button" class="link">Criar conta</button></p>
     </form>
 
     <div id="login-ok" class="login-ok" role="status" hidden>
@@ -147,6 +151,18 @@
       <p id="ok-nome"></p>
       <button id="btn-continuar" type="button">Continuar</button>
     </div>
+  </dialog>
+
+  <dialog id="dlg-gaveta" class="gaveta" aria-label="Carrinho e pedidos">
+    <header class="gaveta-cab">
+      <div class="abas" role="tablist">
+        <button type="button" role="tab" data-aba="carrinho" aria-selected="true"><span class="ico" data-ico="carrinho"></span>Carrinho <span id="aba-qtd" class="qtd-aba" hidden></span></button>
+        <button type="button" role="tab" data-aba="pedidos" aria-selected="false"><span class="ico" data-ico="recibo"></span>Meus pedidos</button>
+      </div>
+      <button type="button" class="icone-x" data-fechar aria-label="Fechar">×</button>
+    </header>
+    <div id="gaveta-corpo" class="gaveta-corpo"></div>
+    <footer id="gaveta-rodape" class="gaveta-rodape" hidden></footer>
   </dialog>
 
   <div id="toasts" aria-live="polite"></div>
